@@ -1,0 +1,112 @@
+<div class="col-md-6" x-data="{ open: true }" >
+    <input  @click.away="{open = false; @this.resetIndex();}" @click="{open = true}" type="text"
+    wire:model="query"
+    wire:keydown.arrow-down.prevent="incrementIndex"
+    wire:keydown.arrow-up.prevent="decrementIndex"
+    wire:keydown.backspace="resetIndex"
+    wire:keydown.enter.prevent="showPlat"
+    class="form-control" placeholder="Rechercher un restaurant" style="border: dotted;">
+
+    @if(strlen($query) > 2)
+    <div x-show="open">
+        @if(count($plats) > 0)
+            @foreach($plats as $index=>$plat)
+            <p class="{{ $index==$selectedIndex ? 'text-text-success' : ''}}">{{$plat->adresse_restaurant}}</p>
+            @endforeach
+        @else
+            <span>0 résultats pour "{{$query}}"</span>
+        @endif
+    </div>
+    @endif
+</div>
+
+
+
+<?php
+
+namespace App\Http\Livewire;
+
+use App\Models\Plat;
+use Illuminate\Support\Facades\DB;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+class Search extends Component
+{
+    public $query;
+    public $plats = [];
+    public $selectedIndex = 0;
+
+    public function incrementIndex()
+    {
+        if ($this->selectedIndex == count($this->plats) - 1) {
+            $this->selectedIndex = 0;
+            return;
+        }
+        $this->selectedIndex++;
+    }
+
+    public function decrementIndex()
+    {
+        if ($this->selectedIndex == 0) {
+            $this->selectedIndex = (count($this->plats) - 1);
+            return;
+        }
+        $this->selectedIndex--;
+    }
+    public function updatedQuery()
+    {
+        $works = '%' . $this->query . '%';
+
+        // if (strlen($this->query) > 2) {
+        //    $this->plats = Plat::where('designation', 'like', $works)
+        //     ->orWhere('description', 'like', $works)
+        //     ->get();
+
+        // }
+
+        if (strlen($this->query) > 2) {
+            $this->plats = DB::table('restaurants')
+                ->join('plats', 'restaurants.id', '=', 'plats.restaurant_id')
+                ->select('restaurants.*', 'plats.*')
+                ->where('restaurants.adresse_restaurant', 'LIKE', $works)
+                ->orderBy('restaurants.created_at', 'DESC')
+                ->get();
+        }
+
+    }
+
+    public function resetIndex()
+    {
+        $this->reset('selectedIndex');
+    }
+
+    public function showPlat()
+    {
+        if ($this->plats) {
+            return redirect()->route('site.show', [$this->plats[$this->selectedIndex]['id']]);
+
+        }
+    }
+
+    use WithPagination;
+    public function render()
+    {
+        $works = '%' . $this->query . '%';
+
+        $plats = Plat::where('designation', 'like', $works)
+            ->orWhere('description', 'like', $works)
+            ->orderBy('id', 'DESC')
+            ->get();
+
+        // $plats = DB::table('restaurants')
+        // ->join('plats', 'restaurants.id', '=', 'plats.restaurant_id')
+        // ->select('restaurants.*', 'plats.*')
+        // ->where('restaurants.adresse_restaurant', 'LIKE', $works)
+        // ->orderBy('restaurants.created_at', 'DESC')
+        // ->get();
+        // dd($plats);
+        return view('livewire.search', ['plats' => $plats]);
+    }
+}
+
